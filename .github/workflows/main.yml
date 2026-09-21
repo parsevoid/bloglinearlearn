@@ -1,0 +1,55 @@
+name: Deploy Website via FTP
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  web-deploy:
+    name: 🎉 Deploy project to server via FTP
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🚚 Checkout code (full history for git diff)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔒 Verify FTP secrets are set
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          if [ -z "$FTP_SERVER" ] || [ -z "$FTP_USERNAME" ] || [ -z "$FTP_PASSWORD" ]; then
+            echo "❌ ERROR: FTP secrets are not configured!"
+            echo "Go to your GitHub repo → Settings → Secrets and variables → Actions"
+            echo "Add these three repository secrets:"
+            echo "  - FTP_SERVER   (e.g. ftp.yourdomain.com)"
+            echo "  - FTP_USERNAME (your FTP username)"
+            echo "  - FTP_PASSWORD (your FTP password)"
+            exit 1
+          fi
+          echo "✅ All FTP secrets are configured."
+
+      - name: 📂 Sync only updated, created & deleted files
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: /domains/blog.linearlearn.com/public_html/
+          dangerous-clean-slate: false
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/.env*
+            **/.DS_Store
+            **/*.md
+            uploads/**
+            logs/**
+            cache/**
+            _image_backup/**
+
