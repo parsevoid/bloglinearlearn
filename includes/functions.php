@@ -404,8 +404,37 @@ function buildContentFromSections(array $sections): string {
     return $html;
 }
 
+/**
+ * Verifies if the 'sections' column exists in the 'posts' table.
+ * If missing, attempts to auto-migrate the table by adding the column.
+ */
+function ensureSectionsColumnExists(PDO $db): bool {
+    static $hasColumn = null;
+    if ($hasColumn !== null) {
+        return $hasColumn;
+    }
+
+    try {
+        $stmt = $db->query("SHOW COLUMNS FROM posts LIKE 'sections'");
+        if ($stmt && $stmt->fetch()) {
+            $hasColumn = true;
+            return true;
+        }
+        // Attempt to auto-add the column if database user has ALTER privileges
+        $db->exec("ALTER TABLE `posts` ADD COLUMN `sections` LONGTEXT DEFAULT NULL AFTER `status`");
+        $hasColumn = true;
+        return true;
+    } catch (Exception $e) {
+        $hasColumn = false;
+        return false;
+    }
+}
+
 function createPost(array $data): int {
     $db = getDB();
+    if (!$db) {
+        throw new RuntimeException('Database connection is not available');
+    }
 
     $sectionsJson = null;
     if (!empty($data['sections']) && is_array($data['sections'])) {
@@ -423,28 +452,77 @@ function createPost(array $data): int {
 
     $content = $data['content'] ?? '';
 
+    // Validate category_id to prevent foreign key constraint violation
+    $categoryId = !empty($data['category_id']) ? (int)$data['category_id'] : null;
+    if ($categoryId !== null) {
+        $cat = getCategoryById($categoryId);
+        if (!$cat) {
+            $categoryId = null;
+        }
+    }
+
+    // Auto-resolve unique slug to avoid duplicate key errors
+    $baseSlug = slugify(!empty($data['slug']) ? $data['slug'] : $data['title']);
+    $slug = $baseSlug;
+    $counter = 1;
+    while (getPostBySlug($slug) !== null) {
+        $counter++;
+        $slug = $baseSlug . '-' . $counter;
+    }
+
+    $hasSections = ensureSectionsColumnExists($db);
+
+    if ($hasSections) {
+        try {
+            $stmt = $db->prepare("
+                INSERT INTO posts (title, slug, content, excerpt, author, category_id, featured_image, read_time, is_featured, status, sections)
+                VALUES (:title, :slug, :content, :excerpt, :author, :category_id, :featured_image, :read_time, :is_featured, :status, :sections)
+            ");
+            $stmt->execute([
+                ':title'          => $data['title'],
+                ':slug'           => $slug,
+                ':content'        => $content,
+                ':excerpt'        => $data['excerpt'] ?? '',
+                ':author'         => $data['author'] ?: 'Anonymous',
+                ':category_id'    => $categoryId,
+                ':featured_image' => $data['featured_image'] ?? '',
+                ':read_time'      => $data['read_time'] ?? readTime($content),
+                ':is_featured'    => $data['is_featured'] ?? 0,
+                ':status'         => $data['status'] ?? 'draft',
+                ':sections'       => $sectionsJson,
+            ]);
+            return (int)$db->lastInsertId();
+        } catch (PDOException $e) {
+            // If unknown column error, fallback to insert without sections
+            if (strpos($e->getMessage(), 'Unknown column') === false && strpos($e->getMessage(), 'sections') === false) {
+                throw $e;
+            }
+        }
+    }
+
+    // Fallback insertion without `sections` column (compatible with legacy schema)
     $stmt = $db->prepare("
-        INSERT INTO posts (title, slug, content, excerpt, author, category_id, featured_image, read_time, is_featured, status, sections)
-        VALUES (:title, :slug, :content, :excerpt, :author, :category_id, :featured_image, :read_time, :is_featured, :status, :sections)
+        INSERT INTO posts (title, slug, content, excerpt, author, category_id, featured_image, read_time, is_featured, status)
+        VALUES (:title, :slug, :content, :excerpt, :author, :category_id, :featured_image, :read_time, :is_featured, :status)
     ");
     $stmt->execute([
         ':title'          => $data['title'],
-        ':slug'           => $data['slug'] ?: slugify($data['title']),
+        ':slug'           => $slug,
         ':content'        => $content,
         ':excerpt'        => $data['excerpt'] ?? '',
         ':author'         => $data['author'] ?: 'Anonymous',
-        ':category_id'    => $data['category_id'] ?: null,
+        ':category_id'    => $categoryId,
         ':featured_image' => $data['featured_image'] ?? '',
         ':read_time'      => $data['read_time'] ?? readTime($content),
         ':is_featured'    => $data['is_featured'] ?? 0,
         ':status'         => $data['status'] ?? 'draft',
-        ':sections'       => $sectionsJson,
     ]);
     return (int)$db->lastInsertId();
 }
 
 function updatePost(int $id, array $data): bool {
     $db = getDB();
+    if (!$db) return false;
 
     $sectionsJson = null;
     if (!empty($data['sections']) && is_array($data['sections'])) {
@@ -461,6 +539,53 @@ function updatePost(int $id, array $data): bool {
     }
 
     $content = $data['content'] ?? '';
+
+    // Validate category_id
+    $categoryId = !empty($data['category_id']) ? (int)$data['category_id'] : null;
+    if ($categoryId !== null) {
+        $cat = getCategoryById($categoryId);
+        if (!$cat) $categoryId = null;
+    }
+
+    $hasSections = ensureSectionsColumnExists($db);
+
+    if ($hasSections) {
+        try {
+            $stmt = $db->prepare("
+                UPDATE posts SET
+                    title = :title,
+                    slug = :slug,
+                    content = :content,
+                    excerpt = :excerpt,
+                    author = :author,
+                    category_id = :category_id,
+                    featured_image = :featured_image,
+                    read_time = :read_time,
+                    is_featured = :is_featured,
+                    status = :status,
+                    sections = :sections
+                WHERE id = :id
+            ");
+            return $stmt->execute([
+                ':id'             => $id,
+                ':title'          => $data['title'],
+                ':slug'           => $data['slug'] ?: slugify($data['title']),
+                ':content'        => $content,
+                ':excerpt'        => $data['excerpt'] ?? '',
+                ':author'         => $data['author'] ?: 'Anonymous',
+                ':category_id'    => $categoryId,
+                ':featured_image' => $data['featured_image'] ?? '',
+                ':read_time'      => $data['read_time'] ?? readTime($content),
+                ':is_featured'    => $data['is_featured'] ?? 0,
+                ':status'         => $data['status'] ?? 'draft',
+                ':sections'       => $sectionsJson,
+            ]);
+        } catch (PDOException $e) {
+            if (strpos($e->getMessage(), 'Unknown column') === false && strpos($e->getMessage(), 'sections') === false) {
+                throw $e;
+            }
+        }
+    }
 
     $stmt = $db->prepare("
         UPDATE posts SET
@@ -473,8 +598,7 @@ function updatePost(int $id, array $data): bool {
             featured_image = :featured_image,
             read_time = :read_time,
             is_featured = :is_featured,
-            status = :status,
-            sections = :sections
+            status = :status
         WHERE id = :id
     ");
     return $stmt->execute([
@@ -484,12 +608,11 @@ function updatePost(int $id, array $data): bool {
         ':content'        => $content,
         ':excerpt'        => $data['excerpt'] ?? '',
         ':author'         => $data['author'] ?: 'Anonymous',
-        ':category_id'    => $data['category_id'] ?: null,
+        ':category_id'    => $categoryId,
         ':featured_image' => $data['featured_image'] ?? '',
         ':read_time'      => $data['read_time'] ?? readTime($content),
         ':is_featured'    => $data['is_featured'] ?? 0,
         ':status'         => $data['status'] ?? 'draft',
-        ':sections'       => $sectionsJson,
     ]);
 }
 

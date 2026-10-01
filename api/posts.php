@@ -90,12 +90,14 @@ if ($method === 'GET') {
 }
 
 if ($method === 'POST') {
-    $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+    $contentType = $_SERVER['CONTENT_TYPE'] ?? ($_SERVER['HTTP_CONTENT_TYPE'] ?? '');
     $data = [];
 
-    if (stripos($contentType, 'application/json') !== false) {
-        $raw = file_get_contents('php://input');
-        $data = json_decode($raw, true) ?: [];
+    $rawInput = file_get_contents('php://input');
+    $decodedJson = json_decode($rawInput, true);
+
+    if (is_array($decodedJson)) {
+        $data = $decodedJson;
     } else {
         $data = $_POST;
         if (isset($data['sections']) && is_string($data['sections'])) {
@@ -190,7 +192,18 @@ if ($method === 'POST') {
         'sections'       => $sections,
     ];
 
-    $postId = createPost($postData);
+    try {
+        $postId = createPost($postData);
+    } catch (Throwable $e) {
+        error_log('API createPost exception: ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'error'   => 'Database error during post creation: ' . $e->getMessage(),
+            'code'    => $e->getCode(),
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
 
     if (!$postId) {
         http_response_code(500);
@@ -267,11 +280,21 @@ if ($method === 'PUT' || $method === 'PATCH') {
         'sections'       => $sections ?: [],
     ];
 
-    $success = updatePost($id, $postData);
+    try {
+        $success = updatePost($id, $postData);
+    } catch (Throwable $e) {
+        error_log('API updatePost exception: ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'error'   => 'Database error during post update: ' . $e->getMessage(),
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
 
     if (!$success) {
         http_response_code(500);
-        echo json_encode(['success' => false, 'error' => 'Failed to update post'], JSON_PRETTY_PRINT);
+        echo json_encode(['success' => false, 'error' => 'Failed to update post in database'], JSON_PRETTY_PRINT);
         exit;
     }
 

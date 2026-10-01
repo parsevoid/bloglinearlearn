@@ -49,6 +49,7 @@ try {
             `views` INT UNSIGNED DEFAULT 0,
             `is_featured` TINYINT(1) DEFAULT 0,
             `status` ENUM('published','draft') DEFAULT 'draft',
+            `sections` LONGTEXT DEFAULT NULL,
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             INDEX `idx_posts_status_created` (`status`, `created_at`),
