@@ -68,9 +68,9 @@ $cleanName = slugify($originalName) ?: 'image';
 $filename = $cleanName . '-' . time() . '-' . mt_rand(100, 999) . '.' . $ext;
 $targetPath = $uploadDir . $filename;
 
-if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
+if (!compressAndSaveImage($file['tmp_name'], $targetPath)) {
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Failed to save file']);
+    echo json_encode(['success' => false, 'error' => 'Failed to process and save image']);
     exit;
 }
 

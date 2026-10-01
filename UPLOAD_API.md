@@ -365,6 +365,16 @@ Uploads an image file and returns its URL for use in post content or featured im
 
 `image/jpeg`, `image/png`, `image/webp`, `image/gif`, `image/svg+xml`
 
+#### Automatic Image Compression & Optimization
+
+Every uploaded image is automatically processed by `compressAndSaveImage()`:
+- **Auto-Resize:** Images exceeding 1600×1600px are scaled down proportionally to preserve bandwidth and performance.
+- **JPEG Optimization:** Auto-rotates orientation using EXIF data and re-encodes at 82% quality (yielding ~60–80% size savings).
+- **PNG Optimization:** Full alpha channel transparency is preserved with high-level compression (level 8).
+- **WebP Optimization:** Re-encodes with lossless alpha transparency preservation at 82% quality.
+- **GIF / SVG:** Bypasses rasterization to preserve animation and vector scalability.
+- **Configurable via `.env`:** You can customize `IMAGE_MAX_WIDTH`, `IMAGE_MAX_HEIGHT`, and `IMAGE_QUALITY` directly in `.env`.
+
 #### Example
 
 ```bash

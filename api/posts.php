@@ -126,7 +126,7 @@ if ($method === 'POST') {
     if (!empty($_FILES['featured_image']['tmp_name']) && $_FILES['featured_image']['error'] === UPLOAD_ERR_OK) {
         $ext = strtolower(pathinfo($_FILES['featured_image']['name'], PATHINFO_EXTENSION)) ?: 'jpg';
         $fname = slugify($title) . '-cover-' . time() . '.' . $ext;
-        if (move_uploaded_file($_FILES['featured_image']['tmp_name'], $uploadDir . $fname)) {
+        if (compressAndSaveImage($_FILES['featured_image']['tmp_name'], $uploadDir . $fname)) {
             $featuredImage = 'uploads/' . $fname;
         }
     }
@@ -143,7 +143,7 @@ if ($method === 'POST') {
             if (!empty($_FILES[$fileKey]['tmp_name']) && $_FILES[$fileKey]['error'] === UPLOAD_ERR_OK) {
                 $ext = strtolower(pathinfo($_FILES[$fileKey]['name'], PATHINFO_EXTENSION)) ?: 'jpg';
                 $fname = slugify($title) . '-sec' . ($i + 1) . '-' . time() . '.' . $ext;
-                if (move_uploaded_file($_FILES[$fileKey]['tmp_name'], $uploadDir . $fname)) {
+                if (compressAndSaveImage($_FILES[$fileKey]['tmp_name'], $uploadDir . $fname)) {
                     $secImage = 'uploads/' . $fname;
                 }
             }

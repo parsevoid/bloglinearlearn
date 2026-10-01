@@ -44,6 +44,11 @@ define('API_KEY', getenv('API_KEY') ?: 'linearlearn_secret_key_2026');
 define('UPLOADS_DIR', __DIR__ . '/../uploads/');
 define('UPLOADS_URL', 'uploads/');
 
+// Image Compression & Optimization Defaults
+define('IMAGE_MAX_WIDTH', (int)(getenv('IMAGE_MAX_WIDTH') ?: 1600));
+define('IMAGE_MAX_HEIGHT', (int)(getenv('IMAGE_MAX_HEIGHT') ?: 1600));
+define('IMAGE_QUALITY', (int)(getenv('IMAGE_QUALITY') ?: 82));
+
 function getDB(): ?PDO {
     static $pdo = null;
     static $hasFailed = false;

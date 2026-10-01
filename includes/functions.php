@@ -628,3 +628,174 @@ function getRelatedPosts(int $postId, int $categoryId, int $limit = 3): array {
     }
     return $related;
 }
+
+/**
+ * Compresses, optimizes, and resizes an uploaded image before saving to destination.
+ * Supports JPEG, PNG, and WebP via GD extension with fallback to direct upload/copy.
+ *
+ * @param string $sourcePath Path to source/temp image file
+ * @param string $destinationPath Target file path to write the compressed image
+ * @param int|null $maxWidth Max width in pixels (proportional scale), null for config default
+ * @param int|null $maxHeight Max height in pixels (proportional scale), null for config default
+ * @param int|null $quality Compression quality (0-100), null for config default
+ * @return bool True on success, false on failure
+ */
+function compressAndSaveImage(
+    string $sourcePath,
+    string $destinationPath,
+    ?int $maxWidth = null,
+    ?int $maxHeight = null,
+    ?int $quality = null
+): bool {
+    $maxWidth = $maxWidth ?? (defined('IMAGE_MAX_WIDTH') ? IMAGE_MAX_WIDTH : 1600);
+    $maxHeight = $maxHeight ?? (defined('IMAGE_MAX_HEIGHT') ? IMAGE_MAX_HEIGHT : 1600);
+    $quality = $quality ?? (defined('IMAGE_QUALITY') ? IMAGE_QUALITY : 82);
+
+    $dir = dirname($destinationPath);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0755, true);
+    }
+
+    if (!file_exists($sourcePath) || !is_readable($sourcePath)) {
+        return false;
+    }
+
+    // Fallback if GD is not installed
+    if (!extension_loaded('gd') || !function_exists('getimagesize')) {
+        return is_uploaded_file($sourcePath)
+            ? move_uploaded_file($sourcePath, $destinationPath)
+            : copy($sourcePath, $destinationPath);
+    }
+
+    $imageInfo = @getimagesize($sourcePath);
+    if ($imageInfo === false) {
+        return is_uploaded_file($sourcePath)
+            ? move_uploaded_file($sourcePath, $destinationPath)
+            : copy($sourcePath, $destinationPath);
+    }
+
+    $origWidth  = (int)$imageInfo[0];
+    $origHeight = (int)$imageInfo[1];
+    $imageType  = (int)$imageInfo[2];
+
+    // Non-raster or animated images: bypass GD compression and preserve directly
+    if ($imageType === IMAGETYPE_GIF || $imageType === IMAGETYPE_ICO) {
+        return is_uploaded_file($sourcePath)
+            ? move_uploaded_file($sourcePath, $destinationPath)
+            : copy($sourcePath, $destinationPath);
+    }
+
+    $srcImage = null;
+    switch ($imageType) {
+        case IMAGETYPE_JPEG:
+            if (function_exists('imagecreatefromjpeg')) {
+                $srcImage = @imagecreatefromjpeg($sourcePath);
+            }
+            break;
+        case IMAGETYPE_PNG:
+            if (function_exists('imagecreatefrompng')) {
+                $srcImage = @imagecreatefrompng($sourcePath);
+            }
+            break;
+        case IMAGETYPE_WEBP:
+            if (function_exists('imagecreatefromwebp')) {
+                $srcImage = @imagecreatefromwebp($sourcePath);
+            }
+            break;
+    }
+
+    if (!$srcImage) {
+        return is_uploaded_file($sourcePath)
+            ? move_uploaded_file($sourcePath, $destinationPath)
+            : copy($sourcePath, $destinationPath);
+    }
+
+    // Auto-orient JPEG based on EXIF camera orientation tag
+    if ($imageType === IMAGETYPE_JPEG && function_exists('exif_read_data') && function_exists('imagerotate')) {
+        $exif = @exif_read_data($sourcePath);
+        if (!empty($exif['Orientation'])) {
+            $rotated = null;
+            switch ($exif['Orientation']) {
+                case 3:
+                    $rotated = @imagerotate($srcImage, 180, 0);
+                    break;
+                case 6:
+                    $rotated = @imagerotate($srcImage, -90, 0);
+                    break;
+                case 8:
+                    $rotated = @imagerotate($srcImage, 90, 0);
+                    break;
+            }
+            if ($rotated) {
+                imagedestroy($srcImage);
+                $srcImage = $rotated;
+                $origWidth = imagesx($srcImage);
+                $origHeight = imagesy($srcImage);
+            }
+        }
+    }
+
+    // Calculate dimensions maintaining aspect ratio
+    $newWidth = $origWidth;
+    $newHeight = $origHeight;
+
+    if ($origWidth > $maxWidth || $origHeight > $maxHeight) {
+        $scale = min($maxWidth / $origWidth, $maxHeight / $origHeight);
+        $newWidth = max(1, (int)round($origWidth * $scale));
+        $newHeight = max(1, (int)round($origHeight * $scale));
+    }
+
+    $dstImage = imagecreatetruecolor($newWidth, $newHeight);
+    if (!$dstImage) {
+        imagedestroy($srcImage);
+        return is_uploaded_file($sourcePath)
+            ? move_uploaded_file($sourcePath, $destinationPath)
+            : copy($sourcePath, $destinationPath);
+    }
+
+    // Preserve transparency for PNG and WebP
+    if ($imageType === IMAGETYPE_PNG || $imageType === IMAGETYPE_WEBP) {
+        imagealphablending($dstImage, false);
+        imagesavealpha($dstImage, true);
+        $transparent = imagecolorallocatealpha($dstImage, 255, 255, 255, 127);
+        imagefilledrectangle($dstImage, 0, 0, $newWidth, $newHeight, $transparent);
+    }
+
+    imagecopyresampled(
+        $dstImage,
+        $srcImage,
+        0, 0, 0, 0,
+        $newWidth,
+        $newHeight,
+        $origWidth,
+        $origHeight
+    );
+
+    $saved = false;
+    $ext = strtolower(pathinfo($destinationPath, PATHINFO_EXTENSION));
+
+    if (($ext === 'webp' || $imageType === IMAGETYPE_WEBP) && function_exists('imagewebp')) {
+        $saved = @imagewebp($dstImage, $destinationPath, $quality);
+    } elseif (($ext === 'png' || $imageType === IMAGETYPE_PNG) && function_exists('imagepng')) {
+        // PNG compression level is 0-9 (8 provides high compression with fast execution)
+        $saved = @imagepng($dstImage, $destinationPath, 8);
+    } elseif (function_exists('imagejpeg')) {
+        $saved = @imagejpeg($dstImage, $destinationPath, $quality);
+    }
+
+    imagedestroy($srcImage);
+    imagedestroy($dstImage);
+
+    if (!$saved) {
+        return is_uploaded_file($sourcePath)
+            ? move_uploaded_file($sourcePath, $destinationPath)
+            : copy($sourcePath, $destinationPath);
+    }
+
+    if (is_uploaded_file($sourcePath) && file_exists($sourcePath)) {
+        @unlink($sourcePath);
+    }
+
+    return true;
+}
+
