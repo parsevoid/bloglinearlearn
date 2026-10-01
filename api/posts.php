@@ -216,5 +216,117 @@ if ($method === 'POST') {
     exit;
 }
 
+if ($method === 'PUT' || $method === 'PATCH') {
+    $raw = file_get_contents('php://input');
+    $data = json_decode($raw, true) ?: [];
+
+    $id = (int)($data['id'] ?? ($_GET['id'] ?? 0));
+    if (!$id) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Post ID is required for update'], JSON_PRETTY_PRINT);
+        exit;
+    }
+
+    $existing = getPostById($id);
+    if (!$existing) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Post not found'], JSON_PRETTY_PRINT);
+        exit;
+    }
+
+    $categoryId = !empty($data['category_id']) ? (int)$data['category_id'] : ($existing['category_id'] ?? null);
+    if (!$categoryId && !empty($data['category'])) {
+        $cat = getCategoryBySlug(slugify($data['category']));
+        if ($cat) $categoryId = (int)$cat['id'];
+    }
+
+    $sections = [];
+    if (!empty($data['sections']) && is_array($data['sections'])) {
+        $sections = $data['sections'];
+    }
+
+    $content = trim($data['content'] ?? '');
+    if (empty($content) && !empty($sections)) {
+        $content = buildContentFromSections($sections);
+    }
+    if (empty($content)) {
+        $content = $existing['content'] ?? '';
+    }
+
+    $postData = [
+        'title'          => trim($data['title'] ?? $existing['title']),
+        'slug'           => slugify($data['slug'] ?? $data['title'] ?? $existing['title']),
+        'content'        => $content,
+        'excerpt'        => trim($data['excerpt'] ?? ($existing['excerpt'] ?? '')),
+        'author'         => trim($data['author'] ?? ($existing['author'] ?? 'Anonymous')),
+        'category_id'    => $categoryId,
+        'featured_image' => trim($data['featured_image'] ?? ($existing['featured_image'] ?? '')),
+        'read_time'      => !empty($data['read_time']) ? (int)$data['read_time'] : readTime($content),
+        'is_featured'    => isset($data['is_featured']) ? (int)$data['is_featured'] : ($existing['is_featured'] ?? 0),
+        'status'         => in_array(strtolower($data['status'] ?? ''), ['published', 'draft']) ? strtolower($data['status']) : ($existing['status'] ?? 'draft'),
+        'sections'       => $sections ?: [],
+    ];
+
+    $success = updatePost($id, $postData);
+
+    if (!$success) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Failed to update post'], JSON_PRETTY_PRINT);
+        exit;
+    }
+
+    $updatedPost = getPostById($id);
+    $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost:8080');
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Post updated successfully',
+        'post_id' => $id,
+        'title'   => $updatedPost['title'] ?? $postData['title'],
+        'slug'    => $updatedPost['slug'] ?? $postData['slug'],
+        'url'     => $baseUrl . '/post.php?slug=' . ($updatedPost['slug'] ?? $postData['slug']),
+        'status'  => $updatedPost['status'] ?? $postData['status'],
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+if ($method === 'DELETE') {
+    $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+    if (!$id) {
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?: [];
+        $id = (int)($data['id'] ?? 0);
+    }
+
+    if (!$id) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Post ID is required'], JSON_PRETTY_PRINT);
+        exit;
+    }
+
+    $existing = getPostById($id);
+    if (!$existing) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Post not found'], JSON_PRETTY_PRINT);
+        exit;
+    }
+
+    $success = deletePost($id);
+
+    if (!$success) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Failed to delete post'], JSON_PRETTY_PRINT);
+        exit;
+    }
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Post deleted successfully',
+        'post_id' => $id,
+        'title'   => $existing['title'],
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 http_response_code(405);
-echo json_encode(['success' => false, 'error' => 'Method Not Allowed']);
+echo json_encode(['success' => false, 'error' => 'Method Not Allowed. Supported: GET, POST, PUT, PATCH, DELETE']);

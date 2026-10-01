@@ -27,7 +27,7 @@ if (isLoggedIn()) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sign In — <?= SITE_NAME ?> Admin</title>
   <link rel="icon" type="image/webp" href="../assets/favicon.webp">
-  <link rel="stylesheet" href="../css/admin.css">
+  <link rel="stylesheet" href="../css/admin.min.css">
 </head>
 <body class="login-body">
   <div class="minimal-login-card">

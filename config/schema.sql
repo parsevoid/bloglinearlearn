@@ -1,8 +1,3 @@
-CREATE DATABASE IF NOT EXISTS `dailyblog` 
-  CHARACTER SET utf8mb4 
-  COLLATE utf8mb4_unicode_ci;
-
-USE `dailyblog`;
 
 DROP TABLE IF EXISTS `users`;
 CREATE TABLE `users` (
@@ -67,6 +62,7 @@ CREATE TABLE `posts` (
   `views` INT UNSIGNED DEFAULT 0,
   `is_featured` TINYINT(1) DEFAULT 0,
   `status` ENUM('published','draft') DEFAULT 'draft',
+  `sections` JSON DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX `idx_posts_status_created` (`status`, `created_at`),

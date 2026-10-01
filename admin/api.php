@@ -12,7 +12,7 @@ $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : '
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>API Access &amp; Docs — <?= SITE_NAME ?> Admin</title>
   <link rel="icon" type="image/webp" href="../assets/favicon.webp">
-  <link rel="stylesheet" href="../css/admin.css">
+  <link rel="stylesheet" href="../css/admin.min.css">
 </head>
 <body class="admin-body">
 

@@ -10,10 +10,10 @@ $pageTitle = $pageTitle ?? SITE_NAME . ' — ' . SITE_TAGLINE;
   <meta name="description" content="<?= e($pageDescription ?? 'Thoughts, stories and practical guides for a calmer, healthier and happier life.') ?>">
   <title><?= e($pageTitle) ?></title>
   <link rel="icon" type="image/webp" href="<?= $baseUrl ?? '' ?>assets/favicon.webp">
-  <link rel="stylesheet" href="<?= $baseUrl ?? '' ?>css/theme.css">
-  <link rel="stylesheet" href="<?= $baseUrl ?? '' ?>css/blog.css">
-  <link rel="stylesheet" href="<?= $baseUrl ?? '' ?>css/responsive.css">
-  <link rel="stylesheet" href="<?= $baseUrl ?? '' ?>css/darkmode.css">
+  <link rel="stylesheet" href="<?= $baseUrl ?? '' ?>css/theme.min.css">
+  <link rel="stylesheet" href="<?= $baseUrl ?? '' ?>css/blog.min.css">
+  <link rel="stylesheet" href="<?= $baseUrl ?? '' ?>css/responsive.min.css">
+  <link rel="stylesheet" href="<?= $baseUrl ?? '' ?>css/darkmode.min.css">
   <?php if (isset($extraCSS)): ?>
     <link rel="stylesheet" href="<?= $baseUrl ?? '' ?><?= $extraCSS ?>">
   <?php endif; ?>

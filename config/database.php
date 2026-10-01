@@ -1,5 +1,33 @@
 <?php
 
+// Load .env configuration if present
+$envPath = dirname(__DIR__) . '/.env';
+if (file_exists($envPath)) {
+    $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if ($lines !== false) {
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, '#')) {
+                continue;
+            }
+            if (strpos($line, '=') !== false) {
+                list($envKey, $envVal) = explode('=', $line, 2);
+                $envKey = trim($envKey);
+                $envVal = trim($envVal);
+                if ((str_starts_with($envVal, '"') && str_ends_with($envVal, '"')) ||
+                    (str_starts_with($envVal, "'") && str_ends_with($envVal, "'"))) {
+                    $envVal = substr($envVal, 1, -1);
+                }
+                if (getenv($envKey) === false) {
+                    putenv("{$envKey}={$envVal}");
+                    $_ENV[$envKey] = $envVal;
+                    $_SERVER[$envKey] = $envVal;
+                }
+            }
+        }
+    }
+}
+
 define('DB_HOST', getenv('DB_HOST') ?: '127.0.0.1');
 define('DB_PORT', getenv('DB_PORT') ?: '3306');
 define('DB_NAME', getenv('DB_NAME') ?: 'dailyblog');
@@ -7,11 +35,11 @@ define('DB_USER', getenv('DB_USER') ?: 'root');
 define('DB_PASS', getenv('DB_PASS') !== false ? getenv('DB_PASS') : '');
 define('DB_CHARSET', 'utf8mb4');
 
-define('SITE_NAME', 'LinearLearn');
-define('SITE_TAGLINE', 'Train Your Brain');
-define('SITE_SUBTITLE', 'Thoughts · Reflection · A Healthier You');
-define('SITE_URL', 'http://localhost:8080');
-define('ADMIN_PASSWORD_DEFAULT', 'admin123');
+define('SITE_NAME', getenv('SITE_NAME') ?: 'LinearLearn');
+define('SITE_TAGLINE', getenv('SITE_TAGLINE') ?: 'Train Your Brain');
+define('SITE_SUBTITLE', getenv('SITE_SUBTITLE') ?: 'Thoughts · Reflection · A Healthier You');
+define('SITE_URL', getenv('SITE_URL') ?: 'http://localhost:8080');
+define('ADMIN_PASSWORD_DEFAULT', getenv('ADMIN_PASSWORD_DEFAULT') ?: 'admin123');
 define('API_KEY', getenv('API_KEY') ?: 'linearlearn_secret_key_2026');
 define('UPLOADS_DIR', __DIR__ . '/../uploads/');
 define('UPLOADS_URL', 'uploads/');

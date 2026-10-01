@@ -37,6 +37,6 @@
     </div>
   </div>
 
-  <script src="<?= $baseUrl ?? '' ?>js/app.js"></script>
+  <script src="<?= $baseUrl ?? '' ?>js/app.min.js"></script>
 </body>
 </html>

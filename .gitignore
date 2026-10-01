@@ -1,0 +1,37 @@
+# Environment and sensitive configuration
+.env
+.env.*
+!.env.example
+
+# Operating System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and Code Editors
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# Dependencies
+vendor/
+node_modules/
+
+# User uploads (keep directory structure with .gitkeep)
+uploads/*
+!uploads/.gitkeep
+
+# Logs and temporary files
+*.log
+error_log
+tmp/
+temp/
+.cache/
